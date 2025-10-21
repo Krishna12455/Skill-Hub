@@ -1,0 +1,45 @@
+.site-footer-onbrand {
+  background: #f3f3ff;
+  padding: 2rem 1rem;
+  border-top: 3px solid #b39ddb;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.footer-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  justify-content: space-around;
+  max-width: 1100px;
+  margin: auto;
+}
+
+.footer-logo-inline {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.footer-logo {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+}
+
+.footer-tagline {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.footer-contact p,
+.footer-location p {
+  margin: 0.3em 0;
+  color: #333;
+}
+
+.footer-bottom {
+  text-align: center;
+  padding-top: 1rem;
+  font-size: 0.9rem;
+  color: #777;
+}

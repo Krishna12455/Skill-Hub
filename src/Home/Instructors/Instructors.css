@@ -1,0 +1,22 @@
+.instructor-card {
+  background-color: #fff;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  text-align: center;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+}
+
+.instructor-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.15);
+}
+
+.instructor-img {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #e0e0e0;
+  margin-bottom: 1rem;
+}
