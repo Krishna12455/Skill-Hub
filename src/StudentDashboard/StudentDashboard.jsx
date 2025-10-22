@@ -863,6 +863,7 @@ import {
   ProgressBar,
   Pagination,
 } from "react-bootstrap";
+import certificateImage from "../assets/images/certificate.png";
 
 const StudentDashboard = () => {
   const [courses, setCourses] = useState([]);
@@ -871,10 +872,16 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [showCertificate, setShowCertificate] = useState(false);
   const [notify, setNotify] = useState("");
   const [bookmarks, setBookmarks] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showProfile, setShowProfile] = useState(false);
+  const [studyNotes, setStudyNotes] = useState({});
+  const [studyTimer, setStudyTimer] = useState({ isRunning: false, time: 0 });
+  const [achievements, setAchievements] = useState([]);
   const videoRef = useRef(null);
+  const timerRef = useRef(null);
   const itemsPerPage = 6;
 
   const user = JSON.parse(localStorage.getItem("user"));
@@ -946,6 +953,134 @@ const StudentDashboard = () => {
     );
   };
 
+  const handleDownloadCertificate = () => {
+    // Create a temporary link element to trigger download
+    const link = document.createElement('a');
+    link.href = certificateImage;
+    link.download = `certificate_${selectedCourse?.courseInfo?.title}_${user?.name || 'student'}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setNotify("Certificate downloaded successfully!");
+  };
+
+  // Study Timer Functions
+  const startStudyTimer = () => {
+    setStudyTimer(prev => ({ ...prev, isRunning: true }));
+    timerRef.current = setInterval(() => {
+      setStudyTimer(prev => ({ ...prev, time: prev.time + 1 }));
+    }, 1000);
+  };
+
+  const stopStudyTimer = () => {
+    setStudyTimer(prev => ({ ...prev, isRunning: false }));
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+  };
+
+  const resetStudyTimer = () => {
+    setStudyTimer({ isRunning: false, time: 0 });
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Notes Functions
+  const addStudyNote = (courseId, note) => {
+    setStudyNotes(prev => ({
+      ...prev,
+      [courseId]: [...(prev[courseId] || []), {
+        id: Date.now(),
+        note,
+        timestamp: new Date(),
+        courseTitle: courses.find(c => c.id === courseId)?.courseInfo?.title
+      }]
+    }));
+    setNotify("Note saved successfully!");
+  };
+
+  const deleteStudyNote = (courseId, noteId) => {
+    setStudyNotes(prev => ({
+      ...prev,
+      [courseId]: prev[courseId]?.filter(note => note.id !== noteId) || []
+    }));
+  };
+
+  // Achievement System
+  const checkAchievements = () => {
+    const newAchievements = [];
+    const enrolledCourses = courses.filter(c => hasEnrolled(c));
+    const completedCourses = enrolledCourses.filter(c => getProgress(c) === 100);
+    
+    // First Course Achievement
+    if (enrolledCourses.length >= 1 && !achievements.includes('first_course')) {
+      newAchievements.push({
+        id: 'first_course',
+        title: 'First Steps',
+        description: 'Enrolled in your first course!',
+        icon: '🎓',
+        earned: new Date()
+      });
+    }
+
+    // Completion Achievement
+    if (completedCourses.length >= 1 && !achievements.includes('first_completion')) {
+      newAchievements.push({
+        id: 'first_completion',
+        title: 'Course Master',
+        description: 'Completed your first course!',
+        icon: '🏆',
+        earned: new Date()
+      });
+    }
+
+    // Study Time Achievement
+    if (studyTimer.time >= 3600 && !achievements.includes('study_marathon')) {
+      newAchievements.push({
+        id: 'study_marathon',
+        title: 'Study Marathon',
+        description: 'Studied for over 1 hour!',
+        icon: '⏰',
+        earned: new Date()
+      });
+    }
+
+    if (newAchievements.length > 0) {
+      setAchievements(prev => [...prev, ...newAchievements]);
+      setNotify(`🎉 Achievement Unlocked: ${newAchievements[0].title}!`);
+    }
+  };
+
+  // Check achievements when progress changes
+  useEffect(() => {
+    checkAchievements();
+  }, [courses, studyTimer.time]);
+
+  // Get student statistics
+  const getStudentStats = () => {
+    const enrolledCourses = courses.filter(c => hasEnrolled(c));
+    const completedCourses = enrolledCourses.filter(c => getProgress(c) === 100);
+    const totalStudyTime = studyTimer.time;
+    const totalNotes = Object.values(studyNotes).flat().length;
+    
+    return {
+      enrolledCourses: enrolledCourses.length,
+      completedCourses: completedCourses.length,
+      totalStudyTime,
+      totalNotes,
+      achievements: achievements.length,
+      completionRate: enrolledCourses.length > 0 ? Math.round((completedCourses.length / enrolledCourses.length) * 100) : 0
+    };
+  };
+
   const handlePayment = async (course) => {
     console.log("💳 Payment clicked for course:", course?.courseInfo?.title);
     console.log("💳 Course data:", course);
@@ -988,9 +1123,147 @@ const StudentDashboard = () => {
     }
   };
 
+  const stats = getStudentStats();
+
   return (
     <Container className="py-4">
       <h2 className="text-center mb-4">Student Dashboard</h2>
+
+      {/* 🎯 Student Profile & Stats */}
+      <Row className="mb-4">
+        <Col md={8}>
+          <Card>
+            <Card.Header className="d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">👤 Your Learning Profile</h5>
+              <Button size="sm" variant="outline-primary" onClick={() => setShowProfile(!showProfile)}>
+                {showProfile ? 'Hide Details' : 'Show Details'}
+              </Button>
+            </Card.Header>
+            <Card.Body>
+              <Row className="text-center">
+                <Col md={3}>
+                  <div className="border rounded p-3">
+                    <h4 className="text-primary">{stats.enrolledCourses}</h4>
+                    <small className="text-muted">Enrolled Courses</small>
+                  </div>
+                </Col>
+                <Col md={3}>
+                  <div className="border rounded p-3">
+                    <h4 className="text-success">{stats.completedCourses}</h4>
+                    <small className="text-muted">Completed</small>
+                  </div>
+                </Col>
+                <Col md={3}>
+                  <div className="border rounded p-3">
+                    <h4 className="text-info">{formatTime(stats.totalStudyTime)}</h4>
+                    <small className="text-muted">Study Time</small>
+                  </div>
+                </Col>
+                <Col md={3}>
+                  <div className="border rounded p-3">
+                    <h4 className="text-warning">{stats.achievements}</h4>
+                    <small className="text-muted">Achievements</small>
+                  </div>
+                </Col>
+              </Row>
+              {showProfile && (
+                <Row className="mt-3">
+                  <Col md={6}>
+                    <h6>📊 Learning Analytics</h6>
+                    <p><strong>Completion Rate:</strong> {stats.completionRate}%</p>
+                    <p><strong>Total Notes:</strong> {stats.totalNotes}</p>
+                    <p><strong>Study Sessions:</strong> {Math.floor(stats.totalStudyTime / 1800)}</p>
+                  </Col>
+                  <Col md={6}>
+                    <h6>🏆 Recent Achievements</h6>
+                    {achievements.slice(-3).map((achievement, index) => (
+                      <div key={index} className="d-flex align-items-center mb-2">
+                        <span className="me-2">{achievement.icon}</span>
+                        <div>
+                          <small><strong>{achievement.title}</strong></small>
+                          <br />
+                          <small className="text-muted">{achievement.description}</small>
+                        </div>
+                      </div>
+                    ))}
+                  </Col>
+                </Row>
+              )}
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={4}>
+          <Card>
+            <Card.Header>
+              <h6 className="mb-0">⏰ Study Timer</h6>
+            </Card.Header>
+            <Card.Body className="text-center">
+              <h3 className="text-primary mb-3">{formatTime(studyTimer.time)}</h3>
+              <div className="d-flex gap-2 justify-content-center">
+                {!studyTimer.isRunning ? (
+                  <Button size="sm" variant="success" onClick={startStudyTimer}>
+                    ▶️ Start
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="warning" onClick={stopStudyTimer}>
+                    ⏸️ Pause
+                  </Button>
+                )}
+                <Button size="sm" variant="outline-secondary" onClick={resetStudyTimer}>
+                  🔄 Reset
+                </Button>
+              </div>
+              <small className="text-muted mt-2 d-block">Track your study sessions</small>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 📝 Study Notes Section */}
+      <Row className="mb-4">
+        <Col>
+          <Card>
+            <Card.Header>
+              <h6 className="mb-0">📝 Study Notes</h6>
+            </Card.Header>
+            <Card.Body>
+              <Row>
+                {Object.entries(studyNotes).map(([courseId, notes]) => (
+                  <Col md={6} key={courseId} className="mb-3">
+                    <div className="border rounded p-3">
+                      <h6>{courses.find(c => c.id === courseId)?.courseInfo?.title}</h6>
+                      {notes.slice(-2).map(note => (
+                        <div key={note.id} className="d-flex justify-content-between align-items-start mb-2">
+                          <div className="flex-grow-1">
+                            <small>{note.note}</small>
+                            <br />
+                            <small className="text-muted">{note.timestamp.toLocaleDateString()}</small>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="outline-danger" 
+                            onClick={() => deleteStudyNote(courseId, note.id)}
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      ))}
+                      {notes.length > 2 && (
+                        <small className="text-muted">+{notes.length - 2} more notes</small>
+                      )}
+                    </div>
+                  </Col>
+                ))}
+                {Object.keys(studyNotes).length === 0 && (
+                  <Col>
+                    <p className="text-muted text-center">No study notes yet. Start taking notes while learning!</p>
+                  </Col>
+                )}
+              </Row>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
 
       <Row className="mb-4">
         <Col md={6}>
@@ -1069,9 +1342,25 @@ const StudentDashboard = () => {
                         Enroll & Pay ₹{c.courseInfo.price}
                       </Button>
                     ) : (
-                      <Button variant="success" disabled>
-                        Enrolled
-                      </Button>
+                      <>
+                        <Button variant="success" disabled>
+                          Enrolled
+                        </Button>
+                        {getProgress(c) > 0 && (
+                          <Button 
+                            variant="outline-info" 
+                            size="sm"
+                            onClick={() => {
+                              const note = prompt("Add a study note for this course:");
+                              if (note && note.trim()) {
+                                addStudyNote(c.id, note.trim());
+                              }
+                            }}
+                          >
+                            📝 Add Note
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
                 </Card.Body>
@@ -1122,6 +1411,46 @@ const StudentDashboard = () => {
           <p>
             <strong>Description:</strong> {selectedCourse?.courseInfo?.description}
           </p>
+          
+          {/* 📝 Study Notes Section in Modal */}
+          {hasEnrolled(selectedCourse) && (
+            <div className="mt-4">
+              <h6>📝 Your Study Notes</h6>
+              <div className="mb-3">
+                <Form.Control
+                  as="textarea"
+                  rows={2}
+                  placeholder="Add a study note..."
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                      const note = e.target.value.trim();
+                      if (note) {
+                        addStudyNote(selectedCourse.id, note);
+                        e.target.value = '';
+                      }
+                    }
+                  }}
+                />
+                <small className="text-muted">Press Ctrl+Enter to save note</small>
+              </div>
+              {studyNotes[selectedCourse?.id]?.map(note => (
+                <div key={note.id} className="border rounded p-2 mb-2 d-flex justify-content-between align-items-start">
+                  <div className="flex-grow-1">
+                    <small>{note.note}</small>
+                    <br />
+                    <small className="text-muted">{note.timestamp.toLocaleDateString()}</small>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    variant="outline-danger" 
+                    onClick={() => deleteStudyNote(selectedCourse.id, note.id)}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowDetail(false)}>
@@ -1131,12 +1460,45 @@ const StudentDashboard = () => {
             <Button
               className="ms-auto"
               variant="outline-success"
-              href={`https://example.com/certificates/${selectedCourse?.id}_${user?.uid}.pdf`}
-              target="_blank"
+              onClick={() => setShowCertificate(true)}
             >
               Download Certificate
             </Button>
           )}
+        </Modal.Footer>
+      </Modal>
+
+      {/* Certificate Modal */}
+      <Modal show={showCertificate} onHide={() => setShowCertificate(false)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>🎓 Course Completion Certificate</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center">
+          <div className="mb-3">
+            <h5>Congratulations! You have successfully completed:</h5>
+            <h4 className="text-primary">{selectedCourse?.courseInfo?.title}</h4>
+            <p className="text-muted">by {selectedCourse?.teacherInfo?.teacherName}</p>
+          </div>
+          <div className="certificate-container" style={{ maxHeight: '500px', overflow: 'auto' }}>
+            <img 
+              src={certificateImage} 
+              alt="Course Completion Certificate" 
+              style={{ 
+                width: '100%', 
+                height: 'auto', 
+                border: '2px solid #dee2e6',
+                borderRadius: '8px'
+              }} 
+            />
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowCertificate(false)}>
+            Close
+          </Button>
+          <Button variant="success" onClick={handleDownloadCertificate}>
+            📥 Download Certificate
+          </Button>
         </Modal.Footer>
       </Modal>
     </Container>
